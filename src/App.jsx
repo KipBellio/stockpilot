@@ -3,7 +3,7 @@ import Landing from './pages/Landing';
 import AdminDashboard from './pages/AdminDashboard';
 import StaffDashboard from './pages/StaffDashboard';
 import Products from './pages/Products';
-
+import Sales from './pages/Sales';
 import Staff from './pages/Staff'; 
 import AppLayout from './components/layout/AppLayout';
 import ProtectedRoute from './components/layout/ProtectedRoute';
