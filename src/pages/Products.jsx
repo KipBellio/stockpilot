@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Search } from 'lucide-react';
+import { Search, Trash2, AlertTriangle, PlusCircle } from 'lucide-react';
 import ProductFormModal from '../components/products/ProductFormModal';
 
 function Products() {
@@ -14,8 +14,10 @@ function Products() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   
-  // State to control the Add Product Modal
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // Modals
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -36,14 +38,54 @@ function Products() {
     setLoading(false);
   }
 
-  // Helper to determine status badge
+  const handleDelete = async () => {
+    if (!productToDelete) return;
+    setIsDeleting(true);
+
+    const { error } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', productToDelete.id);
+
+    if (error) {
+      alert("Error deleting product: " + error.message);
+    } else {
+      setProductToDelete(null);
+      fetchProducts(); // Refresh list
+    }
+    setIsDeleting(false);
+  };
+
+  const handleRestock = async (product) => {
+    const amountStr = prompt(`How many ${product.name} are you adding to stock?`);
+    if (!amountStr) return;
+    
+    const amount = parseInt(amountStr);
+    if (isNaN(amount) || amount <= 0) {
+      alert("Please enter a valid positive number.");
+      return;
+    }
+
+    const newQty = product.quantity + amount;
+
+    const { error } = await supabase
+      .from('products')
+      .update({ quantity: newQty })
+      .eq('id', product.id);
+
+    if (error) {
+      alert("Error updating stock: " + error.message);
+    } else {
+      fetchProducts(); // Refresh list to show new number
+    }
+  };
+
   const getStatus = (qty, reorderLevel) => {
     if (qty === 0) return { label: 'Out of stock', color: 'bg-red-100 text-red-700' };
     if (qty <= reorderLevel) return { label: 'Low stock', color: 'bg-amber-100 text-amber-700' };
     return { label: 'In stock', color: 'bg-green-100 text-green-700' };
   };
 
-  // Filter products based on search and status
   const filteredProducts = products.filter((product) => {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = 
@@ -62,17 +104,15 @@ function Products() {
 
   return (
     <div className="max-w-6xl">
-      {/* Header section */}
       <div className="flex justify-between items-start mb-6">
         <div>
           <h1 className="text-2xl font-semibold text-neutral-900 mb-1">Products</h1>
           <p className="text-sm text-neutral-500">Manage your catalog and stock levels</p>
         </div>
         
-        {/* CONDITIONAL BUTTON: Admin vs Staff */}
         {user?.role === 'admin' ? (
           <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => setIsProductModalOpen(true)}
             className="bg-primary-600 text-white text-sm px-4 py-2 rounded-md hover:bg-primary-700 transition"
           >
             + Add product
@@ -87,7 +127,6 @@ function Products() {
         )}
       </div>
 
-      {/* Toolbar: Search & Filter */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="relative flex-1 max-w-md">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
@@ -112,7 +151,6 @@ function Products() {
         </select>
       </div>
 
-      {/* Products Table (Desktop) / Cards (Mobile) */}
       {loading ? (
         <div className="p-8 text-center text-neutral-500">Loading products...</div>
       ) : filteredProducts.length === 0 ? (
@@ -132,6 +170,7 @@ function Products() {
                   <th className="px-6 py-3 font-medium">Category</th>
                   <th className="px-6 py-3 font-medium text-right">Qty</th>
                   <th className="px-6 py-3 font-medium">Status</th>
+                  {user?.role === 'admin' && <th className="px-6 py-3 font-medium text-center w-28">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
@@ -148,6 +187,26 @@ function Products() {
                           {status.label}
                         </span>
                       </td>
+                      {user?.role === 'admin' && (
+                        <td className="px-6 py-4 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <button 
+                              onClick={() => handleRestock(product)}
+                              title="Restock"
+                              className="p-1.5 text-neutral-400 hover:text-green-600 hover:bg-green-50 rounded transition"
+                            >
+                              <PlusCircle size={16} />
+                            </button>
+                            <button 
+                              onClick={() => setProductToDelete(product)}
+                              title="Delete"
+                              className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded transition"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -172,6 +231,12 @@ function Products() {
                   </div>
                   <div className="flex justify-between items-center mt-4 pt-3 border-t border-neutral-100">
                     <span className="text-sm text-neutral-500">Qty: <strong className="text-neutral-900">{product.quantity}</strong></span>
+                    {user?.role === 'admin' && (
+                      <div className="flex gap-2">
+                        <button onClick={() => handleRestock(product)} className="p-1.5 text-neutral-400 hover:text-green-600 bg-neutral-50 rounded"><PlusCircle size={16} /></button>
+                        <button onClick={() => setProductToDelete(product)} className="p-1.5 text-neutral-400 hover:text-red-600 bg-neutral-50 rounded"><Trash2 size={16} /></button>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -180,12 +245,42 @@ function Products() {
         </>
       )}
 
-      {/* The Add Product Modal */}
       <ProductFormModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+        isOpen={isProductModalOpen} 
+        onClose={() => setIsProductModalOpen(false)} 
         onProductAdded={fetchProducts} 
       />
+
+      {/* Delete Confirmation Modal */}
+      {productToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setProductToDelete(null)}></div>
+          <div className="relative bg-white rounded-lg shadow-xl w-full max-w-sm p-6 text-center">
+            <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
+              <AlertTriangle className="text-red-600" size={24} />
+            </div>
+            <h3 className="text-lg font-semibold text-neutral-900 mb-2">Delete Product?</h3>
+            <p className="text-sm text-neutral-500 mb-6">
+              Are you sure you want to delete <strong className="text-neutral-900">{productToDelete.name}</strong>? This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setProductToDelete(null)}
+                className="flex-1 px-4 py-2 bg-neutral-100 text-neutral-700 rounded-md text-sm font-medium hover:bg-neutral-200"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

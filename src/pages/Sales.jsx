@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Search, ChevronRight } from 'lucide-react';
-import ProductFormModal from '../components/products/ProductFormModal'; // Import the modal
+import { Search, ChevronRight, X } from 'lucide-react';
 
 function Sales() {
   const { user } = useAuth();
@@ -13,8 +12,8 @@ function Sales() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // State for the Add Product Modal (for Admin)
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // State for the Sale Detail Modal
+  const [selectedSale, setSelectedSale] = useState(null);
 
   useEffect(() => {
     fetchSales();
@@ -56,15 +55,7 @@ function Sales() {
           <p className="text-lg text-neutral-800">All recorded transactions</p>
         </div>
         
-        {/* CONDITIONAL BUTTON: Admin sees Add Product, Staff sees New Sale */}
-        {user?.role === 'admin' ? (
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="bg-primary-600 text-white text-lg px-6 py-2 rounded-sm hover:bg-primary-700 transition"
-          >
-            + Add product
-          </button>
-        ) : (
+        {user?.role === 'staff' && (
           <button 
             onClick={() => navigate('/sales/new')}
             className="bg-primary-600 text-white text-lg px-6 py-2 rounded-sm hover:bg-primary-700 transition"
@@ -113,7 +104,10 @@ function Sales() {
                   <td className="px-4 py-2 border-r border-neutral-400">{sale.staff_name}</td>
                   <td className="px-4 py-2 text-center border-r border-neutral-400">{sale.items?.length || 0}</td>
                   <td className="px-4 py-2 text-right border-r border-neutral-400">{Number(sale.total).toLocaleString()}</td>
-                  <td className="px-4 py-2 text-center cursor-pointer hover:bg-neutral-100">
+                  <td 
+                    onClick={() => setSelectedSale(sale)}
+                    className="px-4 py-2 text-center cursor-pointer hover:bg-neutral-200 transition"
+                  >
                     <ChevronRight size={20} className="mx-auto text-neutral-600" />
                   </td>
                 </tr>
@@ -123,15 +117,56 @@ function Sales() {
         </table>
       </div>
 
-      {/* Add Product Modal (Admin Only) */}
-      <ProductFormModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        onProductAdded={() => {
-          setIsModalOpen(false);
-          // Optionally refresh sales data if needed, though sales won't change from adding a product
-        }} 
-      />
+      {/* Sale Detail Modal */}
+      {selectedSale && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setSelectedSale(null)}></div>
+          
+          <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden">
+            <div className="bg-primary-600 px-6 py-4 flex justify-between items-center">
+              <h2 className="text-xl text-white font-normal">Sale Receipt</h2>
+              <button onClick={() => setSelectedSale(null)} className="text-white/80 hover:text-white">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="p-6">
+              <div className="flex justify-between text-sm mb-6 pb-4 border-b border-neutral-200">
+                <div>
+                  <p className="text-neutral-500 mb-1">Date</p>
+                  <p className="font-medium text-neutral-900">{formatDate(selectedSale.created_at)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-neutral-500 mb-1">Recorded By</p>
+                  <p className="font-medium text-neutral-900">{selectedSale.staff_name}</p>
+                </div>
+              </div>
+
+              <div className="space-y-3 mb-6">
+                <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">Items</p>
+                {selectedSale.items?.map((item, index) => (
+                  <div key={index} className="flex justify-between items-center text-sm">
+                    <div>
+                      <p className="font-medium text-neutral-900">{item.name}</p>
+                      <p className="text-neutral-500">{item.qty} x KES {Number(item.price).toLocaleString()}</p>
+                    </div>
+                    <p className="font-medium text-neutral-900">
+                      KES {(item.qty * item.price).toLocaleString()}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="border-t border-neutral-200 pt-4 flex justify-between items-center">
+                <p className="text-lg font-medium text-neutral-900">Total</p>
+                <p className="text-2xl font-semibold text-primary-600">
+                  KES {Number(selectedSale.total).toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

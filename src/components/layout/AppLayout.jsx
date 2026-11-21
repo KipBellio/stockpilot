@@ -1,60 +1,154 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Bell, ChevronDown, LogOut, User as UserIcon, Search } from 'lucide-react';
+import { supabase } from '../../services/supabase';
+import { Search, ChevronDown, LogOut, User as UserIcon, X } from 'lucide-react';
 
 function AppLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
+  // Dropdown & Modal states
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  
+  // Search states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const searchRef = useRef(null);
+
+  // Handle clicking outside the search to close the dropdown
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setShowResults(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Fetch products as you type (debounced)
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setShowResults(false);
+      return;
+    }
+
+    const fetchSearch = async () => {
+      setIsSearching(true);
+      const { data } = await supabase
+        .from('products')
+        .select('id, name, sku, quantity, reorder_level')
+        .or(`name.ilike.%${searchQuery}%,sku.ilike.%${searchQuery}%`)
+        .limit(5);
+      
+      setSearchResults(data || []);
+      setIsSearching(false);
+      setShowResults(true);
+    };
+
+    // Debounce: wait 300ms after typing before hitting the DB
+    const timeoutId = setTimeout(fetchSearch, 300);
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
 
   const handleLogout = async () => {
     await logout();
     navigate('/');
   };
 
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setSearchResults([]);
+    setShowResults(false);
+    // If we are on a product page, go back to the main dashboard
+    if (location.pathname === '/products') {
+      navigate(user?.role === 'admin' ? '/admin' : '/staff');
+    }
+  };
+
   const navItems = [
-    { name: 'Dashboard', path: '/dashboard' },
+    { name: 'Dashboard', path: user?.role === 'admin' ? '/admin' : '/staff' },
     { name: 'Products', path: '/products' },
     { name: 'Sales', path: '/sales' },
   ];
 
   if (user?.role === 'admin') {
-    navItems.push({ name: 'Staff', path: '/staff' });
+    navItems.push({ name: 'Staff', path: '/staff/manage' });
   }
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-white">
       {/* Top Navbar */}
-      <header className="bg-primary-600 h-14 flex items-center justify-between px-6 shrink-0 z-20">
+      <header className="bg-primary-600 h-14 flex items-center justify-between px-6 shrink-0 z-50">
         
-        {/* Logo */}
-        <div className="text-white text-xl font-semibold tracking-tight">
+        <div className="text-white text-xl font-semibold tracking-tight w-48">
           StockPilot
         </div>
         
-        {/* Search Bar */}
-        <div className="flex-grow flex justify-center max-w-md mx-auto relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-          <input 
-            type="text" 
-            placeholder="Search products..." 
-            className="w-full pl-9 pr-4 py-1.5 bg-white/10 border border-white/20 rounded-md text-sm text-white placeholder:text-white/70 focus:outline-none focus:bg-white focus:text-neutral-900 focus:placeholder:text-neutral-400 transition-colors"
-          />
+        {/* Search Bar with Dropdown */}
+        <div className="flex-grow flex justify-center max-w-md mx-auto relative" ref={searchRef}>
+          <div className="relative w-full">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/70" />
+            <input 
+              type="text" 
+              placeholder="Search products..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => searchQuery.trim() && setShowResults(true)}
+              className="w-full pl-9 pr-8 py-1.5 bg-white/10 border border-white/20 rounded-md text-sm text-white placeholder:text-white/70 focus:outline-none focus:bg-white focus:text-neutral-900 focus:placeholder:text-neutral-400 transition-colors"
+            />
+            {searchQuery && (
+              <button 
+                onClick={handleClearSearch}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-white/70 hover:text-white"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+
+          {/* Search Results Dropdown */}
+          {showResults && (
+            <div className="absolute top-12 left-0 w-full bg-white rounded-md shadow-lg border border-neutral-200 overflow-hidden z-50">
+              {isSearching ? (
+                <div className="p-4 text-center text-sm text-neutral-500">Searching...</div>
+              ) : searchResults.length === 0 ? (
+                <div className="p-4 text-center text-sm text-neutral-500">No products found.</div>
+              ) : (
+                <div className="flex flex-col">
+                  {searchResults.map(product => (
+                    <button 
+                      key={product.id}
+                      onClick={() => {
+                        navigate(`/products?edit=${product.id}`); // Navigate to products and trigger edit modal
+                        setShowResults(false);
+                        setSearchQuery('');
+                      }}
+                      className="flex justify-between items-center px-4 py-3 hover:bg-neutral-50 border-b border-neutral-100 last:border-0 text-left"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-neutral-900">{product.name}</p>
+                        <p className="text-xs text-neutral-500">{product.sku}</p>
+                      </div>
+                      <span className="text-xs font-medium text-neutral-600 bg-neutral-100 px-2 py-1 rounded">
+                        Qty: {product.quantity}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Right Side: Bell & Profile */}
-        <div className="flex items-center gap-5">
-          
-          {/* Notification Bell */}
-          <button className="relative text-white/90 hover:text-white transition">
-            <Bell size={20} />
-            <span className="absolute top-0 right-0.5 block h-2 w-2 rounded-full bg-accent-500 ring-2 ring-primary-600"></span>
-          </button>
-
-          {/* Profile Dropdown */}
+        {/* Right Side: Profile */}
+        <div className="flex items-center gap-5 w-48 justify-end">
           <div className="relative">
             <button 
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -73,7 +167,10 @@ function AppLayout() {
                     <p className="text-xs text-neutral-500 truncate">{user?.email}</p>
                   </div>
                   
-                  <button className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50 flex items-center gap-2">
+                  <button 
+                    onClick={() => { setIsDropdownOpen(false); setIsProfileModalOpen(true); }}
+                    className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50 flex items-center gap-2"
+                  >
                     <UserIcon size={14} /> Profile
                   </button>
                   
@@ -135,6 +232,46 @@ function AppLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Profile Modal */}
+      {isProfileModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setIsProfileModalOpen(false)}></div>
+          
+          <div className="relative bg-white rounded-lg shadow-xl w-full max-w-sm p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">My Profile</h2>
+              <button onClick={() => setIsProfileModalOpen(false)} className="text-neutral-500 hover:text-black">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs text-neutral-500 uppercase tracking-wider mb-1">Full Name</p>
+                <p className="text-sm font-medium text-neutral-900">{user?.full_name}</p>
+              </div>
+              <div>
+                <p className="text-xs text-neutral-500 uppercase tracking-wider mb-1">Email Address</p>
+                <p className="text-sm font-medium text-neutral-900">{user?.email}</p>
+              </div>
+              <div>
+                <p className="text-xs text-neutral-500 uppercase tracking-wider mb-1">Role</p>
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-50 text-primary-700 capitalize">
+                  {user?.role}
+                </span>
+              </div>
+            </div>
+            
+            <button 
+              onClick={() => setIsProfileModalOpen(false)}
+              className="mt-6 w-full bg-neutral-100 text-neutral-900 py-2 rounded-md text-sm font-medium hover:bg-neutral-200 transition"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

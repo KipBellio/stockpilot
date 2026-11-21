@@ -8,7 +8,7 @@ import ProductFormModal from '../components/products/ProductFormModal';
 function AdminDashboard() {
     const { user, loading: authLoading } = useAuth();
     const navigate = useNavigate();
-   
+
     const [loading, setLoading] = useState(true);
     const [totalProducts, setTotalProducts] = useState(0);
     const [todaysSales, setTodaysSales] = useState(0);
@@ -89,7 +89,12 @@ function AdminDashboard() {
                 <div className="border border-neutral-300 rounded-md p-4">
                     <div className="flex items-center gap-3 mb-4">
                         <h3 className="text-xl text-neutral-900">Low stock ({lowStock.length})</h3>
-                        <button className="bg-[#138A7C] text-white px-3 py-1 text-sm rounded-sm">View all</button>
+                        <button
+                            onClick={() => navigate('/products')}
+                            className="bg-[#138A7C] text-white px-3 py-1 text-sm rounded-sm hover:bg-[#0f6f64] transition"
+                        >
+                            View all
+                        </button>
                     </div>
                     <div className="space-y-1 text-lg text-neutral-900">
                         {lowStock.length === 0 ? <p className="text-neutral-500 text-sm">All stock levels are healthy.</p> :
@@ -105,7 +110,12 @@ function AdminDashboard() {
                 <div className="border border-neutral-300 rounded-md p-4">
                     <div className="flex items-center gap-3 mb-4">
                         <h3 className="text-xl text-neutral-900">Recent sales</h3>
-                        <button className="bg-[#138A7C] text-white px-3 py-1 text-sm rounded-sm">View all</button>
+                        <button
+                            onClick={() => navigate('/sales')}
+                            className="bg-[#138A7C] text-white px-3 py-1 text-sm rounded-sm hover:bg-[#0f6f64] transition"
+                        >
+                            View all
+                        </button>
                     </div>
                     <div className="space-y-2 text-lg text-neutral-900">
                         {recentSales.length === 0 ? <p className="text-neutral-500 text-sm">No sales recorded yet.</p> :
@@ -139,12 +149,6 @@ function AdminDashboard() {
                         className="border border-neutral-300 px-6 py-3 text-lg text-neutral-900 hover:bg-neutral-50 rounded-sm transition"
                     >
                         + Add product
-                    </button>
-                    <button
-                        onClick={() => navigate('/admin/mfa-setup')}
-                        className="bg-neutral-800 text-white px-4 py-2 rounded"
-                    >
-                        Setup MFA
                     </button>
                 </div>
             </div>

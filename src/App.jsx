@@ -7,8 +7,6 @@ import Products from './pages/Products';
 import Sales from './pages/Sales';
 import Staff from './pages/Staff';
 import NewSale from './pages/NewSale';
-import AdminMFASetup from './pages/AdminMFASetup';
-import AdminMFAVerify from './pages/AdminMFAVerify';
 import Forbidden from './pages/Forbidden';
 import AppLayout from './components/layout/AppLayout';
 import ProtectedRoute from './components/layout/ProtectedRoute';
@@ -62,8 +60,7 @@ function App() {
             } />
 
             <Route path="/staff" element={<StaffDashboard />} />
-            <Route path="/admin/mfa-setup" element={<AdminMFASetup />} />
-            <Route path="/admin/mfa-verify" element={<AdminMFAVerify />} />
+          
             <Route path="/products" element={<Products />} />
             <Route path="/sales" element={<Sales />} />
             <Route path="/sales/new" element={<NewSale />} />

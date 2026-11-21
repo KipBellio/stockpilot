@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
-import { Pencil } from 'lucide-react';
-import AddStaffModal from '../components/staff/AddStaffModal'; // Import the new modal
+import { Trash2 } from 'lucide-react';
+import AddStaffModal from '../components/staff/AddStaffModal';
 
 function Staff() {
   const { user } = useAuth();
@@ -10,9 +10,11 @@ function Staff() {
   const [staffList, setStaffList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false); 
+  
+  // Delete state
+  const [staffToDelete, setStaffToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     fetchStaff();
@@ -33,6 +35,31 @@ function Staff() {
     setLoading(false);
   }
 
+  const handleDelete = async () => {
+    if (!staffToDelete) return;
+    
+    // Prevent admin from deleting themselves
+    if (staffToDelete.id === user.id) {
+      alert("You cannot delete your own account.");
+      setStaffToDelete(null);
+      return;
+    }
+
+    setIsDeleting(true);
+
+    const { error } = await supabase.rpc('delete_staff_account', {
+      staff_id: staffToDelete.id
+    });
+
+    if (error) {
+      alert("Error deleting staff: " + error.message);
+    } else {
+      setStaffToDelete(null);
+      fetchStaff(); // Refresh list
+    }
+    setIsDeleting(false);
+  };
+
   const filteredStaff = staffList.filter((person) => {
     const searchLower = searchTerm.toLowerCase();
     return (
@@ -49,7 +76,6 @@ function Staff() {
           <p className="text-lg text-neutral-800">Manage your team's access</p>
         </div>
         
-        {/* Opens Modal instead of navigating */}
         <button 
           onClick={() => setIsModalOpen(true)}
           className="bg-primary-600 text-white text-lg px-6 py-2 rounded-sm hover:bg-primary-700 transition"
@@ -95,8 +121,14 @@ function Staff() {
                     {person.email || 'No email'}
                   </td>
                   <td className="px-4 py-3 border-r border-neutral-400 capitalize">{person.role}</td>
-                  <td className="px-4 py-3 text-center cursor-pointer hover:bg-neutral-100 border-l border-transparent">
-                    <Pencil size={20} className="mx-auto text-amber-500" />
+                  <td className="px-4 py-3 text-center">
+                    <button 
+                      onClick={() => setStaffToDelete(person)}
+                      title="Remove Staff"
+                      className="cursor-pointer p-1 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded transition"
+                    >
+                      <Trash2 size={20} className="mx-auto" />
+                    </button>
                   </td>
                 </tr>
               ))
@@ -105,12 +137,45 @@ function Staff() {
         </table>
       </div>
 
-      {/* The Modal Component */}
       <AddStaffModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
         onStaffAdded={fetchStaff} 
       />
+
+      {/* Delete Confirmation Modal */}
+      {staffToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setStaffToDelete(null)}></div>
+          
+          <div className="relative bg-white rounded-lg shadow-xl w-full max-w-sm p-6 text-center">
+            <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
+              <Trash2 className="text-red-600" size={24} />
+            </div>
+            
+            <h3 className="text-lg font-semibold text-neutral-900 mb-2">Remove Staff Member?</h3>
+            <p className="text-sm text-neutral-500 mb-6">
+              Are you sure you want to remove <strong className="text-neutral-900">{staffToDelete.full_name}</strong>? They will immediately lose access to the system.
+            </p>
+            
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setStaffToDelete(null)}
+                className="flex-1 px-4 py-2 bg-neutral-100 text-neutral-700 rounded-md text-sm font-medium hover:bg-neutral-200"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+              >
+                {isDeleting ? 'Removing...' : 'Remove'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
