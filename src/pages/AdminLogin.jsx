@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
+import { validateEmail, validatePassword } from '../utils/validators';
 
 function AdminLogin() {
   const [email, setEmail] = useState('');
@@ -12,7 +13,6 @@ function AdminLogin() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  // This clears the form when the page loads
   useEffect(() => {
     setEmail('');
     setPassword('');
@@ -23,6 +23,18 @@ function AdminLogin() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    // 1. Client-side Validation
+    if (!validateEmail(email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      setError(passwordError);
+      return;
+    }
+
     setIsLoading(true);
     try {
       await login(email, password);
@@ -31,13 +43,17 @@ function AdminLogin() {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
 
       if (profile?.role === 'admin') {
-        navigate('/admin'); // Straight to dashboard
+        navigate('/admin');
       } else {
         await supabase.auth.signOut();
         throw new Error("Access Denied. You are not an administrator.");
       }
     } catch (err) {
-      setError(err.message);
+      if (err.message.includes("Invalid login credentials")) {
+        setError("Incorrect email or password.");
+      } else {
+        setError(err.message);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -60,7 +76,6 @@ function AdminLogin() {
           
           {error && <div className="mb-4 text-sm text-red-600 bg-red-50 p-2 rounded">{error}</div>}
 
-          {/* Added autoComplete="off" here */}
           <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
             <div>
               <label className="block text-sm text-neutral-600 mb-1">Email</label>
@@ -69,7 +84,7 @@ function AdminLogin() {
                 value={email} 
                 onChange={(e) => setEmail(e.target.value)} 
                 autoComplete="off"
-                className="w-full px-3 py-2 border border-neutral-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500" 
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 ${error && !validateEmail(email) ? 'border-red-500' : 'border-neutral-200'}`}
                 required 
               />
             </div>
@@ -80,7 +95,7 @@ function AdminLogin() {
                 value={password} 
                 onChange={(e) => setPassword(e.target.value)} 
                 autoComplete="new-password"
-                className="w-full px-3 py-2 border border-neutral-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500" 
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 ${error && password.length < 6 ? 'border-red-500' : 'border-neutral-200'}`}
                 required 
               />
             </div>

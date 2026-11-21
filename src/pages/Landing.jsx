@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { supabase } from '../services/supabase'; // Make sure supabase is imported
+import { supabase } from '../services/supabase';
+import { validateEmail, validatePassword } from '../utils/validators';
 
 function Landing() {
   const [email, setEmail] = useState('');
@@ -22,11 +23,21 @@ function Landing() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (!validateEmail(email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      setError(passwordError);
+      return;
+    }
+
     setIsLoading(true);
     try {
       await login(email, password);
       
-      // Check the user's role to decide where to navigate
       const { data: { user } } = await supabase.auth.getUser();
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
 
@@ -37,7 +48,11 @@ function Landing() {
       }
       
     } catch (err) {
-      setError(err.message);
+      if (err.message.includes("Invalid login credentials")) {
+        setError("Incorrect email or password.");
+      } else {
+        setError(err.message);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -45,31 +60,17 @@ function Landing() {
 
   return (
     <div className="flex h-screen w-full bg-[#B0BCCD]">
-      
-      {/* LEFT PANEL - Teal Section */}
       <div className="hidden lg:flex w-1/2 bg-primary-600 flex-col px-16 py-16">
         <h1 className="text-white text-6xl font-semibold mb-32">StockPilot</h1>
-        
-        <h2 className="text-white text-5xl font-semibold leading-tight mb-12">
-          Manage stock <br /> with confidence.
-        </h2>
-        
-        <p className="text-white text-2xl max-w-lg leading-snug">
-          Track products, monitor stock <br /> levels, and keep your inventory in order.
-        </p>
+        <h2 className="text-white text-5xl font-semibold leading-tight mb-12">Manage stock <br /> with confidence.</h2>
+        <p className="text-white text-2xl max-w-lg leading-snug">Track products, monitor stock <br /> levels, and keep your inventory in order.</p>
       </div>
 
-      {/* RIGHT PANEL - Form Section */}
       <div className="w-full lg:w-1/2 flex items-center justify-center">
         <div className="w-full max-w-[420px] bg-white rounded-xl shadow-sm p-10">
-          
           <h2 className="text-lg font-semibold text-neutral-900 mb-6">Welcome back</h2>
           
-          {error && (
-            <div className="mb-4 text-sm text-red-600 bg-red-50 p-2 rounded">
-              {error}
-            </div>
-          )}
+          {error && <div className="mb-4 text-sm text-red-600 bg-red-50 p-2 rounded">{error}</div>}
 
           <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
             <div>
@@ -78,8 +79,9 @@ function Landing() {
                 type="email" 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                autoComplete="off"
-                className="w-full px-3 py-2 border border-neutral-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500"
+                autoComplete="new-password" 
+                data-lpignore="true"
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 ${error && !validateEmail(email) ? 'border-red-500' : 'border-neutral-200'}`}
                 required 
               />
             </div>
@@ -91,7 +93,8 @@ function Landing() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="new-password"
-                className="w-full px-3 py-2 border border-neutral-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500"
+                data-lpignore="true"
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 ${error && password.length < 6 ? 'border-red-500' : 'border-neutral-200'}`}
                 required 
               />
             </div>
@@ -108,11 +111,8 @@ function Landing() {
           </form>
 
           <div className="mt-8 text-center text-sm text-neutral-700">
-            No account? <span className="font-medium text-primary-600 cursor-pointer hover:underline">Sign up</span>
-            <br />
-            Via Admin
+            No account? Sign up Via Admin
           </div>
-
         </div>
       </div>
     </div>
