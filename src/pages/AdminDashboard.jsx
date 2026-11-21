@@ -8,6 +8,7 @@ import ProductFormModal from '../components/products/ProductFormModal';
 function AdminDashboard() {
     const { user, loading: authLoading } = useAuth();
     const navigate = useNavigate();
+   
     const [loading, setLoading] = useState(true);
     const [totalProducts, setTotalProducts] = useState(0);
     const [todaysSales, setTodaysSales] = useState(0);
