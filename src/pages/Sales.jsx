@@ -3,6 +3,7 @@ import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Search, ChevronRight } from 'lucide-react';
+import ProductFormModal from '../components/products/ProductFormModal'; // Import the modal
 
 function Sales() {
   const { user } = useAuth();
@@ -11,6 +12,9 @@ function Sales() {
   const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // State for the Add Product Modal (for Admin)
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     fetchSales();
@@ -18,7 +22,6 @@ function Sales() {
 
   async function fetchSales() {
     setLoading(true);
-    // Fetch all sales, newest first
     const { data, error } = await supabase
       .from('sales')
       .select('*')
@@ -32,7 +35,6 @@ function Sales() {
     setLoading(false);
   }
 
-  // Format date to "Nov 19 - 14:32"
   const formatDate = (isoString) => {
     const date = new Date(isoString);
     const month = date.toLocaleString('en-US', { month: 'short' });
@@ -41,7 +43,6 @@ function Sales() {
     return `${month} ${day} - ${time}`;
   };
 
-  // Filter sales based on search (Staff name)
   const filteredSales = sales.filter((sale) => 
     sale.staff_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -55,12 +56,22 @@ function Sales() {
           <p className="text-lg text-neutral-800">All recorded transactions</p>
         </div>
         
-        <button 
-          onClick={() => navigate('/sales/new')}
-          className="bg-primary-600 text-white text-lg px-6 py-2 rounded-sm hover:bg-primary-700 transition"
-        >
-          + New sale
-        </button>
+        {/* CONDITIONAL BUTTON: Admin sees Add Product, Staff sees New Sale */}
+        {user?.role === 'admin' ? (
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="bg-primary-600 text-white text-lg px-6 py-2 rounded-sm hover:bg-primary-700 transition"
+          >
+            + Add product
+          </button>
+        ) : (
+          <button 
+            onClick={() => navigate('/sales/new')}
+            className="bg-primary-600 text-white text-lg px-6 py-2 rounded-sm hover:bg-primary-700 transition"
+          >
+            + New sale
+          </button>
+        )}
       </div>
 
       {/* Search Bar */}
@@ -89,11 +100,11 @@ function Sales() {
           <tbody className="divide-y divide-neutral-400">
             {loading ? (
               <tr>
-                <td colSpan="5" className="px-4 py-8 text-center text-neutral-500">Loading sales...</td>
+                <td colSpan="5" className="px-4 py-8 text-center text-neutral-500 text-base">Loading sales...</td>
               </tr>
             ) : filteredSales.length === 0 ? (
               <tr>
-                <td colSpan="5" className="px-4 py-8 text-center text-neutral-500">No sales found.</td>
+                <td colSpan="5" className="px-4 py-8 text-center text-neutral-500 text-base">No sales found.</td>
               </tr>
             ) : (
               filteredSales.map((sale) => (
@@ -111,6 +122,16 @@ function Sales() {
           </tbody>
         </table>
       </div>
+
+      {/* Add Product Modal (Admin Only) */}
+      <ProductFormModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onProductAdded={() => {
+          setIsModalOpen(false);
+          // Optionally refresh sales data if needed, though sales won't change from adding a product
+        }} 
+      />
     </div>
   );
 }

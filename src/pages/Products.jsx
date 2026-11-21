@@ -12,7 +12,10 @@ function Products() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all'); // all, in, low, out
+  const [statusFilter, setStatusFilter] = useState('all');
+  
+  // State to control the Add Product Modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -42,9 +45,10 @@ function Products() {
 
   // Filter products based on search and status
   const filteredProducts = products.filter((product) => {
+    const searchLower = searchTerm.toLowerCase();
     const matchesSearch = 
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      product.sku.toLowerCase().includes(searchTerm.toLowerCase());
+      product.name.toLowerCase().includes(searchLower) || 
+      product.sku.toLowerCase().includes(searchLower);
     
     const status = getStatus(product.quantity, product.reorder_level).label.toLowerCase();
     
@@ -67,7 +71,10 @@ function Products() {
         
         {/* CONDITIONAL BUTTON: Admin vs Staff */}
         {user?.role === 'admin' ? (
-          <button className="bg-primary-600 text-white text-sm px-4 py-2 rounded-md hover:bg-primary-700 transition">
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="bg-primary-600 text-white text-sm px-4 py-2 rounded-md hover:bg-primary-700 transition"
+          >
             + Add product
           </button>
         ) : (
@@ -172,6 +179,13 @@ function Products() {
           </div>
         </>
       )}
+
+      {/* The Add Product Modal */}
+      <ProductFormModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onProductAdded={fetchProducts} 
+      />
     </div>
   );
 }

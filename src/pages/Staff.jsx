@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Pencil } from 'lucide-react';
+import AddStaffModal from '../components/staff/AddStaffModal'; // Import the new modal
 
 function Staff() {
   const { user } = useAuth();
@@ -9,6 +10,9 @@ function Staff() {
   const [staffList, setStaffList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false); 
 
   useEffect(() => {
     fetchStaff();
@@ -16,7 +20,6 @@ function Staff() {
 
   async function fetchStaff() {
     setLoading(true);
-    // Fetch all profiles from Supabase
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -30,31 +33,31 @@ function Staff() {
     setLoading(false);
   }
 
-  // Filter by name or email
   const filteredStaff = staffList.filter((person) => {
     const searchLower = searchTerm.toLowerCase();
     return (
       person.full_name?.toLowerCase().includes(searchLower) ||
-      person.email?.toLowerCase().includes(searchLower) // Note: email might not be in profiles table yet
+      person.email?.toLowerCase().includes(searchLower)
     );
   });
 
   return (
     <div className="max-w-5xl">
-      
-      {/* Header */}
       <div className="flex justify-between items-start mb-6">
         <div>
           <h1 className="text-3xl text-neutral-900 mb-1 font-normal">Staff</h1>
           <p className="text-lg text-neutral-800">Manage your team's access</p>
         </div>
         
-        <button className="bg-primary-600 text-white text-lg px-6 py-2 rounded-sm hover:bg-primary-700 transition">
+        {/* Opens Modal instead of navigating */}
+        <button 
+          onClick={() => setIsModalOpen(true)}
+          className="bg-primary-600 text-white text-lg px-6 py-2 rounded-sm hover:bg-primary-700 transition"
+        >
           + Add staff
         </button>
       </div>
 
-      {/* Search Bar */}
       <div className="mb-6 max-w-sm">
         <input 
           type="text" 
@@ -65,7 +68,6 @@ function Staff() {
         />
       </div>
 
-      {/* Staff Table */}
       <div className="border border-neutral-400 rounded-none bg-white overflow-hidden">
         <table className="w-full text-left text-xl">
           <thead className="border-b border-neutral-400 text-neutral-900">
@@ -90,7 +92,7 @@ function Staff() {
                 <tr key={person.id} className="hover:bg-neutral-50 transition">
                   <td className="px-4 py-3 border-r border-neutral-400">{person.full_name}</td>
                   <td className="px-4 py-3 border-r border-neutral-400 truncate max-w-[200px]">
-                    {person.email || 'No email in profile'}
+                    {person.email || 'No email'}
                   </td>
                   <td className="px-4 py-3 border-r border-neutral-400 capitalize">{person.role}</td>
                   <td className="px-4 py-3 text-center cursor-pointer hover:bg-neutral-100 border-l border-transparent">
@@ -102,6 +104,13 @@ function Staff() {
           </tbody>
         </table>
       </div>
+
+      {/* The Modal Component */}
+      <AddStaffModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onStaffAdded={fetchStaff} 
+      />
     </div>
   );
 }

@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import AddStaffModal from '../components/staff/AddStaffModal';
+import ProductFormModal from '../components/products/ProductFormModal';
 
 function AdminDashboard() {
-  // 1. Get authLoading and user from Context
   const { user, loading: authLoading } = useAuth(); 
-  const navigate = useNavigate();
   
   const [loading, setLoading] = useState(true);
   const [totalProducts, setTotalProducts] = useState(0);
@@ -14,46 +13,45 @@ function AdminDashboard() {
   const [salesCount, setSalesCount] = useState(0);
   const [lowStock, setLowStock] = useState([]);
   const [recentSales, setRecentSales] = useState([]);
+  
+  const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+
+  // Moved fetchData outside useEffect so we can call it after adding a product
+  async function fetchData() {
+    if (!user) return;
+
+    setLoading(true);
+    try {
+      const { data: products } = await supabase.from('products').select('*');
+      const { data: sales } = await supabase.from('sales').select('*').order('created_at', { ascending: false });
+
+      if (products) {
+        setTotalProducts(products.length);
+        setLowStock(products.filter(p => p.quantity <= p.reorder_level));
+      }
+      if (sales) {
+        const today = new Date().toISOString().split('T')[0];
+        const todayData = sales.filter(s => s.created_at.startsWith(today));
+        setTodaysSales(todayData.reduce((sum, s) => sum + Number(s.total), 0));
+        setSalesCount(todayData.length);
+        setRecentSales(sales.slice(0, 2));
+      }
+    } catch (error) {
+      console.error("Error fetching dashboard:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function fetchData() {
-      if (!user) return; // Don't fetch if no user
-
-      setLoading(true);
-      try {
-        const { data: products } = await supabase.from('products').select('*');
-        const { data: sales } = await supabase.from('sales').select('*').order('created_at', { ascending: false });
-
-        if (products) {
-          setTotalProducts(products.length);
-          setLowStock(products.filter(p => p.quantity <= p.reorder_level));
-        }
-        if (sales) {
-          const today = new Date().toISOString().split('T')[0];
-          const todayData = sales.filter(s => s.created_at.startsWith(today));
-          setTodaysSales(todayData.reduce((sum, s) => sum + Number(s.total), 0));
-          setSalesCount(todayData.length);
-          setRecentSales(sales.slice(0, 2));
-        }
-      } catch (error) {
-        console.error("Error fetching dashboard:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    // 2. Only run fetch if auth is done and we have a user
     if (!authLoading && user) {
       fetchData();
     }
   }, [user, authLoading]);
 
-  // 3. Only show full-screen loading if Auth is still checking
   if (authLoading) return <div className="p-8 text-neutral-600">Loading user...</div>;
 
-  // If data is still fetching, show a subtle loading state inside the UI
-  // (Or just let it render with 0s until data arrives)
-  
   return (
     <div className="max-w-5xl">
       <div className="flex justify-between items-start mb-10">
@@ -61,7 +59,11 @@ function AdminDashboard() {
           <h1 className="text-3xl text-neutral-900 mb-2 font-normal">Admin Dashboard</h1>
           <p className="text-lg text-neutral-800">Overview of your inventory</p>
         </div>
-        <button onClick={() => navigate('/products')} className="bg-primary-600 text-white text-lg px-6 py-2 rounded-sm hover:bg-primary-700 transition">
+        
+        <button 
+          onClick={() => setIsProductModalOpen(true)} 
+          className="bg-primary-600 text-white text-lg px-6 py-2 rounded-sm hover:bg-primary-700 transition"
+        >
           + Add product
         </button>
       </div>
@@ -122,10 +124,38 @@ function AdminDashboard() {
       <div className="border border-neutral-300 rounded-md p-6">
         <h3 className="text-xl text-neutral-900 text-center mb-6 uppercase tracking-wider">Quick Actions</h3>
         <div className="flex justify-center gap-6">
-          <button onClick={() => navigate('/staff')} className="border border-neutral-300 px-6 py-3 text-lg text-neutral-900 hover:bg-neutral-50 rounded-sm transition">+ Add staff</button>
-          <button onClick={() => navigate('/products')} className="border border-neutral-300 px-6 py-3 text-lg text-neutral-900 hover:bg-neutral-50 rounded-sm transition">+ Add product</button>
+          
+          <button 
+            onClick={() => setIsStaffModalOpen(true)} 
+            className="border border-neutral-300 px-6 py-3 text-lg text-neutral-900 hover:bg-neutral-50 rounded-sm transition"
+          >
+            + Add staff
+          </button>
+          
+          <button 
+            onClick={() => setIsProductModalOpen(true)} 
+            className="border border-neutral-300 px-6 py-3 text-lg text-neutral-900 hover:bg-neutral-50 rounded-sm transition"
+          >
+            + Add product
+          </button>
         </div>
       </div>
+
+      {/* Modals */}
+      <AddStaffModal 
+        isOpen={isStaffModalOpen} 
+        onClose={() => setIsStaffModalOpen(false)} 
+        onStaffAdded={() => setIsStaffModalOpen(false)} 
+      />
+
+      <ProductFormModal 
+        isOpen={isProductModalOpen} 
+        onClose={() => setIsProductModalOpen(false)} 
+        onProductAdded={() => {
+          setIsProductModalOpen(false);
+          fetchData(); 
+        }} 
+      />
     </div>
   );
 }
