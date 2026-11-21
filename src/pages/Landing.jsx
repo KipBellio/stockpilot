@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { supabase } from '../services/supabase'; // Make sure supabase is imported
 
 function Landing() {
   const [email, setEmail] = useState('');
@@ -24,7 +25,17 @@ function Landing() {
     setIsLoading(true);
     try {
       await login(email, password);
-      navigate('/dashboard');
+      
+      // Check the user's role to decide where to navigate
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+
+      if (profile?.role === 'admin') {
+        navigate('/admin'); 
+      } else {
+        navigate('/staff');
+      }
+      
     } catch (err) {
       setError(err.message);
     } finally {
@@ -95,19 +106,6 @@ function Landing() {
               </button>
             </div>
           </form>
-
-          <div className="flex items-center justify-center mt-6 mb-6">
-            <div className="h-px bg-neutral-300 w-16"></div>
-            <span className="px-3 text-sm text-neutral-500">Or</span>
-            <div className="h-px bg-neutral-300 w-16"></div>
-          </div>
-
-          <button 
-            type="button"
-            className="w-full text-center text-sm text-neutral-700 hover:text-black transition"
-          >
-            Continue with Google
-          </button>
 
           <div className="mt-8 text-center text-sm text-neutral-700">
             No account? <span className="font-medium text-primary-600 cursor-pointer hover:underline">Sign up</span>

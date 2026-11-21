@@ -1,32 +1,32 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Landing from './pages/Landing';
+import AdminLogin from './pages/AdminLogin'; // <-- Ensure this is exactly here
 import AdminDashboard from './pages/AdminDashboard';
 import StaffDashboard from './pages/StaffDashboard';
 import Products from './pages/Products';
 import Sales from './pages/Sales';
 import Staff from './pages/Staff';
 import NewSale from './pages/NewSale';
+import AdminMFASetup from './pages/AdminMFASetup';
+import AdminMFAVerify from './pages/AdminMFAVerify';
 import Forbidden from './pages/Forbidden';
 import AppLayout from './components/layout/AppLayout';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
 
-// Redirects logged-in users away from the public login page
+// Redirects logged-in users away from public login pages
 function PublicOnlyRoute({ children }) {
   const { user, loading } = useAuth();
   if (loading) return <div>Loading...</div>;
-  if (user) return <Navigate to="/dashboard" replace />;
+  
+  // If logged in, send them to their dashboard
+  if (user) {
+    return <Navigate to={user.role === 'admin' ? '/admin' : '/staff'} replace />;
+  }
   return children;
 }
 
-// Decides whether to show the Admin Dashboard or Staff Dashboard
-function DashboardRouter() {
-  const { user } = useAuth();
-  if (user?.role === 'admin') return <AdminDashboard />;
-  return <StaffDashboard />;
-}
-
-// Blocks Staff from accessing Admin-only pages (like /staff)
+// Blocks Staff from accessing Admin-only pages
 function AdminRoute({ children }) {
   const { user, loading } = useAuth();
   if (loading) return <div>Loading...</div>;
@@ -38,24 +38,37 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public Route (Landing/Login) */}
+        {/* Public Routes */}
         <Route path="/" element={<PublicOnlyRoute><Landing /></PublicOnlyRoute>} />
+        
+        {/* SECRET ADMIN LOGIN ROUTE */}
+        <Route path="/adminlogin" element={
+          <PublicOnlyRoute>
+            <AdminLogin />
+          </PublicOnlyRoute>
+        } />
 
         {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>
           
-          {/* 403 Forbidden page (no sidebar) */}
           <Route path="/403" element={<Forbidden />} />
 
-          {/* All other pages share the App Shell (Sidebar + Navbar) */}
           <Route element={<AppLayout />}>
-            <Route path="/dashboard" element={<DashboardRouter />} />
+            
+            <Route path="/admin" element={
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
+            } />
+
+            <Route path="/staff" element={<StaffDashboard />} />
+            <Route path="/admin/mfa-setup" element={<AdminMFASetup />} />
+            <Route path="/admin/mfa-verify" element={<AdminMFAVerify />} />
             <Route path="/products" element={<Products />} />
             <Route path="/sales" element={<Sales />} />
             <Route path="/sales/new" element={<NewSale />} />
             
-            {/* Admin-only route */}
-            <Route path="/staff" element={
+            <Route path="/staff/manage" element={
               <AdminRoute>
                 <Staff />
               </AdminRoute>
