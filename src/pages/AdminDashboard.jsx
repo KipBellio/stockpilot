@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
+import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 function AdminDashboard() {
+  // 1. Get authLoading and user from Context
+  const { user, loading: authLoading } = useAuth(); 
   const navigate = useNavigate();
+  
   const [loading, setLoading] = useState(true);
   const [totalProducts, setTotalProducts] = useState(0);
   const [todaysSales, setTodaysSales] = useState(0);
@@ -13,28 +17,43 @@ function AdminDashboard() {
 
   useEffect(() => {
     async function fetchData() {
+      if (!user) return; // Don't fetch if no user
+
       setLoading(true);
-      const { data: products } = await supabase.from('products').select('*');
-      const { data: sales } = await supabase.from('sales').select('*').order('created_at', { ascending: false });
+      try {
+        const { data: products } = await supabase.from('products').select('*');
+        const { data: sales } = await supabase.from('sales').select('*').order('created_at', { ascending: false });
 
-      if (products) {
-        setTotalProducts(products.length);
-        setLowStock(products.filter(p => p.quantity <= p.reorder_level));
+        if (products) {
+          setTotalProducts(products.length);
+          setLowStock(products.filter(p => p.quantity <= p.reorder_level));
+        }
+        if (sales) {
+          const today = new Date().toISOString().split('T')[0];
+          const todayData = sales.filter(s => s.created_at.startsWith(today));
+          setTodaysSales(todayData.reduce((sum, s) => sum + Number(s.total), 0));
+          setSalesCount(todayData.length);
+          setRecentSales(sales.slice(0, 2));
+        }
+      } catch (error) {
+        console.error("Error fetching dashboard:", error);
+      } finally {
+        setLoading(false);
       }
-      if (sales) {
-        const today = new Date().toISOString().split('T')[0];
-        const todayData = sales.filter(s => s.created_at.startsWith(today));
-        setTodaysSales(todayData.reduce((sum, s) => sum + Number(s.total), 0));
-        setSalesCount(todayData.length);
-        setRecentSales(sales.slice(0, 2));
-      }
-      setLoading(false);
     }
-    fetchData();
-  }, []);
 
-  if (loading) return <div className="p-8 text-neutral-600">Loading...</div>;
+    // 2. Only run fetch if auth is done and we have a user
+    if (!authLoading && user) {
+      fetchData();
+    }
+  }, [user, authLoading]);
 
+  // 3. Only show full-screen loading if Auth is still checking
+  if (authLoading) return <div className="p-8 text-neutral-600">Loading user...</div>;
+
+  // If data is still fetching, show a subtle loading state inside the UI
+  // (Or just let it render with 0s until data arrives)
+  
   return (
     <div className="max-w-5xl">
       <div className="flex justify-between items-start mb-10">
@@ -71,7 +90,10 @@ function AdminDashboard() {
           <div className="space-y-1 text-lg text-neutral-900">
             {lowStock.length === 0 ? <p className="text-neutral-500 text-sm">All stock levels are healthy.</p> : 
               lowStock.slice(0, 3).map((item) => (
-                <div key={item.id} className="flex justify-between"><span>{item.name}</span> <span>: {item.quantity} - {item.quantity === 0 ? 'Out' : 'Low'}</span></div>
+                <div key={item.id} className="flex justify-between border-b border-neutral-100 pb-1">
+                  <span>{item.name}</span> 
+                  <span>: {item.quantity} - {item.quantity === 0 ? 'Out' : 'Low'}</span>
+                </div>
               ))}
           </div>
         </div>
@@ -84,9 +106,12 @@ function AdminDashboard() {
           <div className="space-y-2 text-lg text-neutral-900">
             {recentSales.length === 0 ? <p className="text-neutral-500 text-sm">No sales recorded yet.</p> : 
               recentSales.map((sale) => (
-                <div key={sale.id}>
-                  <div className="flex gap-2 items-center"><span className="text-2xl">•</span> <span>{new Date(sale.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {sale.staff_name}</span></div>
-                  <div className="ml-5">{sale.items?.length || 0} items; {Number(sale.total).toLocaleString()}</div>
+                <div key={sale.id} className="border-b border-neutral-100 pb-1">
+                  <div className="flex gap-2 items-center">
+                    <span className="text-xl">•</span> 
+                    <span>{new Date(sale.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {sale.staff_name}</span>
+                  </div>
+                  <div className="ml-5 text-neutral-600">{sale.items?.length || 0} items; {Number(sale.total).toLocaleString()}</div>
                 </div>
               ))}
           </div>
