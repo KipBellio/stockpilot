@@ -64,36 +64,28 @@ function NewSale() {
     return cart.reduce((total, item) => total + (item.price * item.cartQty), 0);
   };
 
-  const handleCheckout = async () => {
+    const handleCheckout = async () => {
     if (cart.length === 0) return;
     setIsProcessing(true);
 
     try {
-      const saleData = {
-        staff_id: user.id,
-        staff_name: user.full_name || user.email,
-        total: calculateTotal(),
-        items: cart.map(item => ({
+      // Call the secure database function instead of doing it manually
+      const { error } = await supabase.rpc('process_sale', {
+        sale_staff_id: user.id,
+        sale_staff_name: user.full_name || user.email,
+        sale_total: calculateTotal(),
+        sale_items: cart.map(item => ({
           productId: item.id,
           name: item.name,
           price: item.price,
           qty: item.cartQty
         }))
-      };
+      });
 
-      // 1. Create the sale
-      const { error: saleError } = await supabase.from('sales').insert([saleData]);
-      if (saleError) throw saleError;
+      if (error) throw error;
 
-      // 2. Deduct stock
-      for (const item of cart) {
-        const newQty = item.quantity - item.cartQty;
-        await supabase.from('products').update({ quantity: newQty }).eq('id', item.id);
-      }
-
-      // 3. Success
       alert("Sale completed successfully!");
-      navigate('/dashboard');
+      navigate(user.role === 'admin' ? '/admin' : '/staff');
 
     } catch (error) {
       console.error(error);
